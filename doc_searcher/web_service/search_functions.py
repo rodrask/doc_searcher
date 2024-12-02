@@ -7,8 +7,6 @@ import tantivy
 from doc_searcher.web_service.query_parser import PreprocessedQuery
 
 INDEXED_FIELDS = ["url", "title", "content", "code", "links_texts"]
-FIELDS_BOOST = [3, 1, 1, 0.5, 0.5]
-PHRASE_BOOST = 1.5
 
 
 @dataclass

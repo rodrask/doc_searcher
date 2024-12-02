@@ -1,5 +1,4 @@
 import re
-from collections import defaultdict
 from dataclasses import dataclass
 from urllib import parse
 
@@ -16,24 +15,21 @@ class PreprocessedQuery:
     expanded_query: str
     query_len: int
 
-    def bigrams(self):
-        return zip(self.query_terms, self.query_terms[1:])
-
-
 nonwords = re.compile("[\\W_]+")
 spaces = re.compile("\\s+")
-URL_BOOST = 3
+URL_BOOST = 4
 TITLE_BOOST = 2
-CODE_BOOST = 1.2
+CODE_BOOST = 1.5
 
 
-def site_expanders(sites):
+def site_expanders(term, sites):
+    yield f"title:{term}^{TITLE_BOOST}"
     for site in sites:
         yield f"url:{site}^{URL_BOOST}"
         yield f"title:{site}^{TITLE_BOOST}"
 
 
-def expand(terms, subterms_lst, expansions):
+def expand(subterms_lst, expansions):
     result = []
     for subterms, expansion, in zip(subterms_lst, expansions):        
         result.extend(subterms)
@@ -68,7 +64,7 @@ def preprocess_query(raw_query: str):
             subterms[pos].append(sub_term)
             term_sites.update(LANGUAGE_DICT.get(sub_term, []))
         if term_sites:
-            expansions[pos] = list(site_expanders(term_sites))
+            expansions[pos] = list(site_expanders(term, term_sites))
             continue
 
         code_expand = []
@@ -83,6 +79,6 @@ def preprocess_query(raw_query: str):
 
         expansions[pos] = code_expand
 
-    expanded_query = expand(terms, subterms, expansions)
+    expanded_query = expand(subterms, expansions)
     print(f"Expanded query: {expanded_query}")
     return PreprocessedQuery(raw_query, expanded_query, len(terms))

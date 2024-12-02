@@ -53,7 +53,6 @@ LANGUAGE_DICT = {
     "expressjs": ["expressjs.com"],
     "f#": ["fsharp.org"],
     "fastapi": ["fastapi.tiangolo.com"],
-    "flow": ["flow.org"],
     "fsharp": ["fsharp.org"],
     "getbootstrap": ["getbootstrap.com"],
     "getcomposer": ["getcomposer.org"],
