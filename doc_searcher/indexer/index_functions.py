@@ -1,10 +1,11 @@
-from array import array
 import json
-import sqlean as sqlite3
+from array import array
 from urllib.parse import urlparse
+
+import sqlean as sqlite3
 import tantivy
 
-from crawler.url_utils import DOCS_KEYWORDS, priority_url_dummy
+from doc_searcher.crawler.url_utils import DOCS_KEYWORDS, priority_url_dummy
 
 
 def create_in_memory_db():
@@ -70,8 +71,8 @@ def insert_data_from_json(conn, json_line, do_commit=True):
 
     cursor.execute(
         """
-        INSERT INTO documents (docid, url, domain, date, title, content, code, 
-                               url_num_appears, term_in_url, term_in_title, 
+        INSERT INTO documents (docid, url, domain, date, title, content, code,
+                               url_num_appears, term_in_url, term_in_title,
                                content_len, code_len, out_links, out_links_len)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (docid) DO UPDATE SET url_num_appears = url_num_appears + 1
@@ -121,14 +122,14 @@ def clean_db(conn):
     cursor.execute("DROP VIEW IF EXISTS enriched_documents_normalized")
     cursor.execute("DELETE FROM documents")
     cursor.execute("DELETE FROM links")
-    
+
     conn.commit()
 
 
-def feature_extraction(conn):
+def generate_doc_table(conn, n=10000):
     cursor = conn.cursor()
-    cursor.execute("""
-        CREATE VIEW enriched_documents_normalized AS 
+    cursor.execute(f"""
+        CREATE VIEW enriched_documents_normalized AS
         WITH enriched_documents AS (
             SELECT
                 d.*,
@@ -163,7 +164,7 @@ def feature_extraction(conn):
         FROM enriched_documents d
         JOIN domain_stats ds ON 1=1
         ORDER BY normalized_term_in_url+normalized_term_in_title+normalized_code_len+normalized_content_len DESC
-        LIMIT 10000;
+        LIMIT {n};
     """)
     conn.commit()
 
@@ -172,21 +173,11 @@ def build_schema():
     schema_builder = tantivy.SchemaBuilder()
     schema_builder.add_integer_field("doc_id", stored=True, indexed=False)
     schema_builder.add_date_field("date", stored=True, indexed=False)
-    schema_builder.add_text_field(
-        "url", stored=True, tokenizer_name="default"
-    )
-    schema_builder.add_text_field(
-        "title", stored=True, tokenizer_name="en_stem"
-    )
-    schema_builder.add_text_field(
-        "content", stored=True, tokenizer_name="en_stem"
-    )
-    schema_builder.add_text_field(
-        "code", stored=True, tokenizer_name="default"
-    )
-    schema_builder.add_text_field(
-        "links_texts", stored=False, tokenizer_name="en_stem"
-    )
+    schema_builder.add_text_field("url", stored=True, tokenizer_name="default")
+    schema_builder.add_text_field("title", stored=True, tokenizer_name="en_stem")
+    schema_builder.add_text_field("content", stored=True, tokenizer_name="en_stem")
+    schema_builder.add_text_field("code", stored=True, tokenizer_name="default")
+    schema_builder.add_text_field("links_texts", stored=False, tokenizer_name="en_stem")
     schema_builder.add_bytes_field("features", stored=False, indexed=False, fast=True)
     schema = schema_builder.build()
     return schema
@@ -217,11 +208,19 @@ feature_keys = [
 ]
 
 
+def validate_row(row):
+    return all(row[key] is not None for key in ["docid", "date", "url"])
+
+
 def index_selected_docs(conn, index_writer):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM enriched_documents_normalized")
+    indexed_docs = 0
     for row in cursor:
+        if not validate_row(row):
+            continue
+
         feature_vector = [row[key] or 0 for key in feature_keys]
         feature_vector_bytes = array("f", feature_vector).tobytes()
 
@@ -230,11 +229,13 @@ def index_selected_docs(conn, index_writer):
                 doc_id=row["docid"],
                 date=row["date"],
                 url=row["url"],
-                title=row["title"],
-                content=row["content"],
-                code=row["code"],
+                title=row["title"] or "",
+                content=row["content"] or "",
+                code=row["code"] or "",
                 links_texts=" ".join(row["in_texts"]),
                 features=feature_vector_bytes,
             )
         )
+        indexed_docs += 1
     index_writer.commit()
+    return indexed_docs

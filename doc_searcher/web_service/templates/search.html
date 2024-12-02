@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet"  href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.classless.min.css" />
+
+    <title>Test Documentation Search {{ query }}</title>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Select all links on the search page
+            const links = document.querySelectorAll('a.serp');
+        
+            // Function to log the clicked URL
+            function logClick(event) {
+                const url = event.currentTarget.href;
+                const data = JSON.stringify({ url: url });
+        
+                // Use sendBeacon to log the clicked URL
+                navigator.sendBeacon('/click', data);
+            }
+        
+            // Attach the logClick function to each link's click event
+            links.forEach(link => {
+                link.addEventListener('click', logClick);
+            });
+        });    </script>
+</head>
+<body>
+    <main class="container" style="width: 80%">
+        <h4>Documentation Search</h4>
+            <form action="/search" method="get">
+                <fieldset role="grid">
+                <input type="search" name="q" value="{{ query }}" required style="width: 45%">
+                <button type="submit" style="width: 30%">Search</button>
+            </fieldset>
+            </form>
+        
+    <p>Query latency: {{ latency|round(2) }} milliseconds</p>
+    {% if results %}
+        <h2>Results for {{query}}</h2>
+        <ul>
+            {% for result in results %}
+                <li>
+                    <a class="serp" href="{{ result.url }}" target="_blank">{{ result.title }}</a>
+                    <p style="width:50%">{{ result.snippet }}</p>
+                </li>
+            {% endfor %}
+        </ul>
+    {% elif error %}
+        <p style="color: red">{{ error }}</p>
+    
+    {% endif %}
+    <a href="/stat" >Show statistics</a>
+    </main>
+</body>
+</html>

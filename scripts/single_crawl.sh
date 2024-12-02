@@ -1,5 +1,4 @@
 #!/bin/bash
 DOMAIN=$1
-echo "Start crawling $DOMAIN " $(date +"%Y-%m-%d %H:%M:%S")
-python crawl.py -p data -mp 30000 -d $DOMAIN
-echo "Finish crawling $DOMAIN " $(date +"%Y-%m-%d %H:%M:%S")
+OUT_DIR=${2:-data}
+python -m doc_searcher.crawl -d $DOMAIN -p $OUT_DIR -mp 30000 

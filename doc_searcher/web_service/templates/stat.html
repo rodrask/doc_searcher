@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet"  href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.classless.min.css" />
+    <title>Test Documentation Search Statistics</title>
+</head>
+<body>
+    <main class="container" style="width: 60%">
+        <h2 style="text-align: center;">Documentation Search Statistics</h2>
+    <table>
+        <tr>
+            <td>Number of documents in index</td>
+            <td>{{ stat.docs_in_index }}</td>
+        </tr>
+        <tr>
+            <td>Number of domains in index</td>
+            <td>{{ stat.domains_in_index }}</td>
+        </tr>        
+        <tr>
+            <td>Top 3 domains in index</td>
+            <td>
+                {% for dom,c in stat.top3_domains %}
+                {{ dom }}: {{ c }}<br>
+                {% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td>Uptime, seconds</td>
+            <td>{{ stat.uptime_seconds() }}</td>
+        </tr>
+        <tr>
+            <td>Processed queries</td>
+            <td>{{ stat.processed_queries }}</td>
+        </tr>
+        <tr>
+            <td>Average latency, milliseconds</td>
+            <td>{{ stat.avg_latency|round(2) }}</td>
+        </tr>
+        <tr>
+            <td>Top 3 domains by showed documents</td>
+            <td>
+                {% for dom,c in stat.top_showed_domains(3) %}
+                {{ dom }}: {{ c }}<br>
+                {% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td>Top 3 domains by clicked documents</td>
+            <td>
+                {% for dom,c in stat.top_clicked_domains(3) %}
+                {{ dom }}: {{ c }}<br>
+                {% endfor %}
+            </td>
+        </tr>
+    </table>
+    </main>
+</body>
+</html>

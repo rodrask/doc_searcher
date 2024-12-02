@@ -1,17 +1,27 @@
-from collections import defaultdict
 import re
-from typing import Any, Optional
-import scrapy
-from scrapy.spiders import CrawlSpider
-from scrapy.linkextractors import LinkExtractor
-from scrapy.http import Response
-from trafilatura import extract
+from collections import defaultdict
+from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
+from typing import Any, Optional
 
-from crawler.items import CrawledPageItem
+import scrapy
+from scrapy.http import Response
+from scrapy.linkextractors import LinkExtractor
+from scrapy.spiders import CrawlSpider
+from trafilatura import extract
 from w3lib.url import canonicalize_url
 
-from crawler.url_utils import priority_url_dummy
+from doc_searcher.crawler.url_utils import priority_url_dummy
+
+
+@dataclass
+class CrawledPageItem:
+    date: Optional[int]
+    url: str
+    title: str
+    content: str
+    code_snippets: list[str]
+    out_links: dict[str, list[str]]
 
 
 class DomainSpider(CrawlSpider):
@@ -29,31 +39,41 @@ class DomainSpider(CrawlSpider):
     def start_requests(self):
         self.link_extractor = self.create_link_extractor()
         self.state["pages"] = 0
-        self.logger.info(f"Starting crawl for domain {self.domain} {self.allowed_domains} at {self.start_url}")
+        self.logger.info(
+            f"Starting crawl for domain {self.domain} {self.allowed_domains} at {self.start_url}"
+        )
         yield scrapy.Request(url=self.start_url, callback=self.parse_page)
 
     def extract_code_snippets(self, response) -> list[str]:
-        return [code.strip() for code in response.css("code::text").extract() if code.strip()]
+        return [
+            code.strip()
+            for code in response.css("code::text").extract()
+            if code.strip()
+        ]
 
     def extract_title(self, response) -> str:
         return response.css("title::text").extract_first().strip() or ""
-    
+
     def validate_content_type(self, response) -> bool:
-        return response.headers.get("Content-Type", b"").startswith(b"text/html") or \
-            response.headers.get("Content-Type", b"").startswith(b"text/plain")
+        return response.headers.get("Content-Type", b"").startswith(
+            b"text/html"
+        ) or response.headers.get("Content-Type", b"").startswith(b"text/plain")
 
     def extract_main_content(self, response) -> str:
-        if response.headers.get("Content-Type", b"").startswith(b"text/html"):
-            return extract(response.css("body").extract_first())
-        elif response.headers.get("Content-Type", b"").startswith(b"text/plain"):
-            return response.text.strip()
-        else:
+        try:
+            if response.headers.get("Content-Type", b"").startswith(b"text/html"):
+                return extract(response.css("html").extract_first())
+            elif response.headers.get("Content-Type", b"").startswith(b"text/plain"):
+                return response.text.strip()
+            else:
+                return ""
+        except Exception:
             return ""
 
     def extract_date(self, response) -> Optional[int]:
         date = response.headers.get("Last-Modified", None)
         if not date:
-            date = response.headers.get("Date", None)        
+            date = response.headers.get("Date", None)
         if date:
             try:
                 return int(parsedate_to_datetime(str(date)).timestamp())
@@ -69,13 +89,13 @@ class DomainSpider(CrawlSpider):
         date = self.extract_date(response)
 
         code_snippets = self.extract_code_snippets(response)
-        content = self.extract_main_content(response)
+        content = self.extract_main_content(response) or ""
 
         links = self.link_extractor.extract_links(response)
-        
+
         grouped_links = defaultdict(list)
         for link in links:
-            link_text = re.sub(r'\s+', ' ', link.text).strip()
+            link_text = re.sub(r"\s+", " ", link.text).strip()
             if link.fragment.strip():
                 link_text += " " + link.fragment.strip()
             grouped_links[link.url].append(link_text)

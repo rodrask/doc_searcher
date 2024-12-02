@@ -1,11 +1,11 @@
-from dataclasses import dataclass
-from typing import Optional
-from urllib.parse import urlparse
 import re
+import time
+from dataclasses import dataclass
+from urllib.parse import urlparse
 
 import requests
 
-DOCS_KEYWORDS = {
+DOCS_KEYWORDS_LIST = [
     "doc",
     "docs",
     "document",
@@ -28,7 +28,9 @@ DOCS_KEYWORDS = {
     "reference",
     "references",
     "knowledgebase",
-    "faq"}
+    "faq",
+]
+DOCS_KEYWORDS = set(DOCS_KEYWORDS_LIST)
 
 
 def underscore_domain(domain: str) -> str:
@@ -51,7 +53,7 @@ def priority_url_dummy(url) -> int:
 
 @dataclass
 class ProbeResult:
-    init_domain: str
+    resolved_domain: str
     code: int
     message: str
     start_url: str
@@ -59,18 +61,47 @@ class ProbeResult:
     def is_ok(self) -> bool:
         return self.code == 200
 
-    def real_domain(self) -> str:
-        return urlparse(self.start_url).netloc
+
+def drop_www(domain: str) -> str:
+    return domain[4:] if domain.startswith("www.") else domain
 
 
 def probe_domain(domain: str) -> ProbeResult:
     try:
-        result = requests.get(f"http://{domain}")
+        result = requests.get(f"https://{domain}")
+        resolved = urlparse(result.url)
+        resolved_domain = drop_www(resolved.netloc)
+
+        scheme = resolved.scheme
+        start_url = select_start_url(scheme, resolved_domain) or result.url
+
         return ProbeResult(
-            init_domain=domain,
+            resolved_domain=resolved_domain,
             code=result.status_code,
             message=result.reason,
-            start_url=result.url,
+            start_url=start_url,
         )
     except requests.exceptions.RequestException as e:
-        return ProbeResult(domain, -1, e.strerror, f"http://{domain}")
+        print(e)
+        return ProbeResult(domain, -1, e.strerror, f"https://{domain}")
+
+
+def select_start_url(scheme: str, domain: str):
+    for candidate_url in candidates(scheme, domain):
+        try:
+            result = requests.get(
+                candidate_url,
+            )
+            if result.status_code == 200:
+                return result.url
+        except requests.exceptions.RequestException:
+            continue
+        time.sleep(0.1)
+
+    return None
+
+
+def candidates(scheme: str, domain: str):
+    for word in DOCS_KEYWORDS_LIST:
+        yield f"{scheme}://{word}.{domain}"
+        yield f"{scheme}://{domain}/{word}"
