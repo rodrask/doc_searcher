@@ -8,9 +8,9 @@ import tantivy
 from robyn import Robyn
 from robyn.templating import JinjaTemplate
 
+from doc_searcher.web_service.query_parser import preprocess_query
 from doc_searcher.web_service.search_functions import (
     doc_to_render,
-    normalize_query,
     raw_search,
 )
 from doc_searcher.web_service.stat import ServiceStats
@@ -41,7 +41,7 @@ async def search(request, global_dependencies):
             "search.html", {"error": "Query parameter 'q' is required"}
         )
     top_n = int(request.query_params.get("n") or 10)
-    query = normalize_query(raw_query)
+    query = preprocess_query(raw_query)
 
     raw_results = list(raw_search(global_dependencies["index"], query, top_n))
     results = [doc_to_render(r.doc, r.snippet) for r in raw_results]
@@ -50,7 +50,7 @@ async def search(request, global_dependencies):
 
     global_dependencies["stat"].update_with_serp([d.url for d in results], latency_ms)
     return JINJA_TEMPLATE.render_template(
-        "search.html", query=query.query, results=results, latency=latency_ms
+        "search.html", query=query.in_query, results=results, latency=latency_ms
     )
 
 
