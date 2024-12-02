@@ -51,9 +51,9 @@ def generate_subterms(term):
 
 
 def preprocess_query(raw_query: str):
-    print(f"Preprocessing query: {raw_query}")
+    # print(f"Preprocessing query: {raw_query}")
     raw_query = parse.unquote(raw_query.replace("+", " "))
-    print(f"Unquoted: {raw_query}")
+    # print(f"Unquoted: {raw_query}")
     terms = re.sub(spaces, " ", raw_query).lower().split()
     expansions = [None] * len(terms)
     term_sites = set()
@@ -80,5 +80,5 @@ def preprocess_query(raw_query: str):
         expansions[pos] = code_expand
 
     expanded_query = expand(subterms, expansions)
-    print(f"Expanded query: {expanded_query}")
+    # print(f"Expanded query: {expanded_query}")
     return PreprocessedQuery(raw_query, expanded_query, len(terms))

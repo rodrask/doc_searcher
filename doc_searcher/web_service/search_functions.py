@@ -43,10 +43,18 @@ def raw_search(index: tantivy.Index, query: PreprocessedQuery, top_n: int):
         )
         result = searcher.search(
             parsed_query,
-            limit=top_n,
+            limit=top_n*2,
         ).hits
+        yield_so_far = 0
+        yielded_titles = set()
         for score, doc_id in result:
+            if yield_so_far >= top_n:
+                break
             doc = searcher.doc(doc_id)
+            if doc["title"][0] in yielded_titles:
+                continue
+            yielded_titles.add(doc["title"][0])
+            yield_so_far += 1
             snippet = (
                 snippet_generator_content.snippet_from_doc(doc).to_html()
                 or snippet_generator_code.snippet_from_doc(doc).to_html()
@@ -54,7 +62,6 @@ def raw_search(index: tantivy.Index, query: PreprocessedQuery, top_n: int):
             yield SearchItem(doc_id, doc, score, snippet)
     except Exception as e:
         print(f"Error during search: {e}, query {query}")
-
 
 def doc_to_render(doc: tantivy.Document, snippet: str):
     return SearchRenderItem(url=doc["url"][0], title=doc["title"][0], snippet=snippet)
